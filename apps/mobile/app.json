@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Mtracker",
+    "slug": "mtracker",
+    "owner": "aash023",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.aash.mtracker"
+    },
+    "scheme": "mtracker",
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}

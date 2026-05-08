@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mtracker-api
+  namespace: mtracker
+spec:
+  selector:
+    app: mtracker-api
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer   # use ClusterIP + Ingress in production

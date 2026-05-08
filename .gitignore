@@ -1,0 +1,33 @@
+# Environment
+.env
+.env.local
+
+# Go
+apps/api/bin/
+apps/api/*.out
+
+# Node / Expo
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/.expo-shared/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Docker
+*.tar
+
+# Kubernetes secrets (never commit)
+k8s/**/secret.yaml
+
+# Claude Code local settings
+.claude/

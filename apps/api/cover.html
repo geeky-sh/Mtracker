@@ -1,0 +1,929 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>config: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/aash/mtracker/apps/api/internal/config/config.go (100.0%)</option>
+				
+				<option value="file1">github.com/aash/mtracker/apps/api/internal/database/database.go (0.0%)</option>
+				
+				<option value="file2">github.com/aash/mtracker/apps/api/internal/handlers/activities.go (96.6%)</option>
+				
+				<option value="file3">github.com/aash/mtracker/apps/api/internal/handlers/analytics.go (100.0%)</option>
+				
+				<option value="file4">github.com/aash/mtracker/apps/api/internal/handlers/auth.go (91.5%)</option>
+				
+				<option value="file5">github.com/aash/mtracker/apps/api/internal/handlers/logs.go (100.0%)</option>
+				
+				<option value="file6">github.com/aash/mtracker/apps/api/internal/middleware/auth.go (100.0%)</option>
+				
+				<option value="file7">github.com/aash/mtracker/apps/api/internal/middleware/logger.go (100.0%)</option>
+				
+				<option value="file8">github.com/aash/mtracker/apps/api/internal/models/models.go (100.0%)</option>
+				
+				<option value="file9">github.com/aash/mtracker/apps/api/internal/router/router.go (75.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package config
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/joho/godotenv"
+)
+
+type Config struct {
+        Port           string
+        JWTSecret      string
+        GoogleClientID string
+        DatabaseURL    string
+}
+
+func Load() *Config <span class="cov8" title="1">{
+        // Best-effort load of .env (ignored if file absent in prod)
+        _ = godotenv.Load("../../.env")
+
+        return &amp;Config{
+                Port:           getEnv("PORT", "8080"),
+                JWTSecret:      mustEnv("JWT_SECRET"),
+                GoogleClientID: mustEnv("GOOGLE_CLIENT_ID"),
+                DatabaseURL:    buildDSN(),
+        }
+}</span>
+
+func buildDSN() string <span class="cov8" title="1">{
+        host := getEnv("POSTGRES_HOST", "localhost")
+        port := getEnv("POSTGRES_PORT", "5432")
+        user := getEnv("POSTGRES_USER", "mtracker")
+        pass := getEnv("POSTGRES_PASSWORD", "mtracker_secret")
+        db := getEnv("POSTGRES_DB", "mtracker")
+        return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=UTC",
+                host, port, user, pass, db)
+}</span>
+
+func getEnv(key, fallback string) string <span class="cov8" title="1">{
+        if v := os.Getenv(key); v != "" </span><span class="cov8" title="1">{
+                return v
+        }</span>
+        <span class="cov8" title="1">return fallback</span>
+}
+
+func mustEnv(key string) string <span class="cov8" title="1">{
+        v := os.Getenv(key)
+        if v == "" </span><span class="cov8" title="1">{
+                panic(fmt.Sprintf("required environment variable %q is not set", key))</span>
+        }
+        <span class="cov8" title="1">return v</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package database
+
+import (
+        "github.com/aash/mtracker/apps/api/internal/config"
+        "github.com/aash/mtracker/apps/api/internal/models"
+        "gorm.io/driver/postgres"
+        "gorm.io/gorm"
+        "gorm.io/gorm/logger"
+)
+
+func Connect(cfg *config.Config) (*gorm.DB, error) <span class="cov0" title="0">{
+        db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &amp;gorm.Config{
+                Logger: logger.Default.LogMode(logger.Info),
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if err := db.Exec("CREATE EXTENSION IF NOT EXISTS pgcrypto").Error; err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if err := db.AutoMigrate(
+                &amp;models.User{},
+                &amp;models.Activity{},
+                &amp;models.ActivityLog{},
+        ); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Unique constraint: one log per activity per day
+        <span class="cov0" title="0">db.Exec(`
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_logs_activity_date
+                ON activity_logs (activity_id, logged_date)
+        `)
+
+        return db, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package handlers
+
+import (
+        "net/http"
+        "strings"
+        "time"
+
+        "github.com/aash/mtracker/apps/api/internal/middleware"
+        "github.com/aash/mtracker/apps/api/internal/models"
+        "github.com/gin-gonic/gin"
+        "github.com/google/uuid"
+        "gorm.io/gorm"
+)
+
+// Predefined palette — colours are assigned cyclically based on activity count.
+var palette = []string{
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
+        "#F7DC6F", "#DDA0DD", "#98D8C8", "#F0B27A",
+        "#BB8FCE", "#85C1E9", "#82E0AA", "#F1948A",
+}
+
+type ActivitiesHandler struct {
+        db *gorm.DB
+}
+
+func NewActivitiesHandler(db *gorm.DB) *ActivitiesHandler <span class="cov8" title="1">{
+        return &amp;ActivitiesHandler{db: db}
+}</span>
+
+type createActivityRequest struct {
+        Name        string `json:"name"        binding:"required,min=1,max=100"`
+        Description string `json:"description" binding:"max=500"`
+}
+
+// List returns all activities for the authenticated user, each with its last logged date.
+func (h *ActivitiesHandler) List(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        var activities []models.Activity
+        if err := h.db.Where("user_id = ?", userID).
+                Order("created_at ASC").
+                Find(&amp;activities).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch activities"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">if len(activities) &gt; 0 </span><span class="cov8" title="1">{
+                type lastLog struct {
+                        ActivityID string
+                        MaxDate    *time.Time
+                }
+                var rows []lastLog
+                ids := make([]string, len(activities))
+                for i, a := range activities </span><span class="cov8" title="1">{
+                        ids[i] = a.ID.String()
+                }</span>
+                <span class="cov8" title="1">h.db.Raw(`SELECT activity_id::text, MAX(logged_date) AS max_date FROM activity_logs WHERE activity_id::text IN ? AND user_id = ? GROUP BY activity_id`, ids, userID).Scan(&amp;rows)
+
+                dateMap := make(map[string]*time.Time, len(rows))
+                for _, r := range rows </span><span class="cov0" title="0">{
+                        r := r
+                        dateMap[r.ActivityID] = r.MaxDate
+                }</span>
+                <span class="cov8" title="1">for i := range activities </span><span class="cov8" title="1">{
+                        activities[i].LastLoggedDate = dateMap[activities[i].ID.String()]
+                }</span>
+        }
+
+        <span class="cov8" title="1">c.JSON(http.StatusOK, activities)</span>
+}
+
+// Create adds a new activity and auto-assigns a colour.
+func (h *ActivitiesHandler) Create(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+
+        var req createActivityRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var count int64
+        h.db.Model(&amp;models.Activity{}).Where("user_id = ?", userID).Count(&amp;count)
+
+        activity := models.Activity{
+                UserID:      userID,
+                Name:        strings.TrimSpace(req.Name),
+                Description: strings.TrimSpace(req.Description),
+                Color:       palette[int(count)%len(palette)],
+        }
+
+        if err := h.db.Create(&amp;activity).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create activity"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusCreated, activity)</span>
+}
+
+// Delete removes an activity and all its associated logs.
+func (h *ActivitiesHandler) Delete(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        activityID, err := uuid.Parse(c.Param("id"))
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid activity id"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var activity models.Activity
+        if err := h.db.First(&amp;activity, "id = ? AND user_id = ?", activityID, userID).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusNotFound, gin.H{"error": "activity not found"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">if err := h.db.Where("activity_id = ? AND user_id = ?", activityID, userID).Delete(&amp;models.ActivityLog{}).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete logs"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">if err := h.db.Delete(&amp;activity).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete activity"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{"message": "deleted"})</span>
+}
+
+// Search returns activities whose names contain the query string (case-insensitive).
+// Used to surface similar activities while the user is typing.
+func (h *ActivitiesHandler) Search(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        q := strings.TrimSpace(c.Query("q"))
+        if q == "" </span><span class="cov8" title="1">{
+                c.JSON(http.StatusOK, []models.Activity{})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var activities []models.Activity
+        if err := h.db.Where("user_id = ? AND name ILIKE ?", userID, "%"+q+"%").
+                Order("name ASC").
+                Limit(5).
+                Find(&amp;activities).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, activities)</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package handlers
+
+import (
+        "net/http"
+        "strconv"
+        "time"
+
+        "github.com/aash/mtracker/apps/api/internal/middleware"
+        "github.com/gin-gonic/gin"
+        "gorm.io/gorm"
+)
+
+type AnalyticsHandler struct {
+        db *gorm.DB
+}
+
+func NewAnalyticsHandler(db *gorm.DB) *AnalyticsHandler <span class="cov8" title="1">{
+        return &amp;AnalyticsHandler{db: db}
+}</span>
+
+type ActivitySummary struct {
+        ActivityID string `json:"activity_id"`
+        Name       string `json:"name"`
+        Color      string `json:"color"`
+        Count      int    `json:"count"`
+}
+
+func (h *AnalyticsHandler) Summary(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+
+        days, err := strconv.Atoi(c.DefaultQuery("days", "30"))
+        if err != nil || days &lt;= 0 || days &gt; 365 </span><span class="cov8" title="1">{
+                days = 30
+        }</span>
+
+        <span class="cov8" title="1">since := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -days)
+
+        var results []ActivitySummary
+        if err := h.db.Raw(`
+                SELECT a.id::text AS activity_id, a.name, a.color, COUNT(l.id) AS count
+                FROM activities a
+                LEFT JOIN activity_logs l ON l.activity_id = a.id
+                        AND l.logged_date &gt;= ?
+                        AND l.user_id = ?
+                WHERE a.user_id = ?
+                GROUP BY a.id, a.name, a.color
+                ORDER BY count DESC
+        `, since, userID, userID).Scan(&amp;results).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch analytics"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">c.JSON(http.StatusOK, results)</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package handlers
+
+import (
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "time"
+
+        "github.com/aash/mtracker/apps/api/internal/middleware"
+        "github.com/aash/mtracker/apps/api/internal/models"
+        "github.com/gin-gonic/gin"
+        "github.com/golang-jwt/jwt/v5"
+        "gorm.io/gorm"
+)
+
+type AuthHandler struct {
+        db        *gorm.DB
+        jwtSecret string
+}
+
+func NewAuthHandler(db *gorm.DB, jwtSecret string) *AuthHandler <span class="cov8" title="1">{
+        return &amp;AuthHandler{db: db, jwtSecret: jwtSecret}
+}</span>
+
+type googleUserInfo struct {
+        Sub     string `json:"sub"`
+        Email   string `json:"email"`
+        Name    string `json:"name"`
+        Picture string `json:"picture"`
+}
+
+type googleAuthRequest struct {
+        AccessToken string `json:"access_token" binding:"required"`
+}
+
+// GoogleSignIn verifies a Google OAuth access token, upserts the user, and returns a JWT.
+func (h *AuthHandler) GoogleSignIn(c *gin.Context) <span class="cov8" title="1">{
+        var req googleAuthRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "access_token is required"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">info, err := fetchGoogleUserInfo(req.AccessToken)
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid Google access token"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var user models.User
+        result := h.db.Where("google_id = ?", info.Sub).First(&amp;user)
+        if result.Error == gorm.ErrRecordNotFound </span><span class="cov8" title="1">{
+                user = models.User{
+                        Email:     info.Email,
+                        GoogleID:  info.Sub,
+                        Name:      info.Name,
+                        AvatarURL: info.Picture,
+                }
+                if err := h.db.Create(&amp;user).Error; err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+                        return
+                }</span>
+        } else<span class="cov8" title="1"> if result.Error != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+                return
+        }</span> else<span class="cov8" title="1"> {
+                h.db.Model(&amp;user).Updates(map[string]interface{}{
+                        "name":       info.Name,
+                        "avatar_url": info.Picture,
+                })
+        }</span>
+
+        <span class="cov8" title="1">token, err := h.issueJWT(user)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue token"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{
+                "token": token,
+                "user":  user,
+        })</span>
+}
+
+func (h *AuthHandler) issueJWT(user models.User) (string, error) <span class="cov8" title="1">{
+        claims := middleware.Claims{
+                UserID: user.ID,
+                Email:  user.Email,
+                RegisteredClaims: jwt.RegisteredClaims{
+                        ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)),
+                        IssuedAt:  jwt.NewNumericDate(time.Now()),
+                },
+        }
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+        return token.SignedString([]byte(h.jwtSecret))
+}</span>
+
+var googleUserInfoURL = "https://www.googleapis.com/oauth2/v3/userinfo"
+
+func fetchGoogleUserInfo(accessToken string) (*googleUserInfo, error) <span class="cov8" title="1">{
+        resp, err := http.Get(fmt.Sprintf("%s?access_token=%s", googleUserInfoURL, accessToken))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("google returned status %d", resp.StatusCode)
+        }</span>
+
+        <span class="cov8" title="1">body, err := io.ReadAll(resp.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">var info googleUserInfo
+        if err := json.Unmarshal(body, &amp;info); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if info.Sub == "" </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("invalid user info response")
+        }</span>
+        <span class="cov8" title="1">return &amp;info, nil</span>
+}
+
+type loginRequest struct {
+        Username string `json:"username" binding:"required"`
+        Password string `json:"password" binding:"required"`
+}
+
+// Login authenticates with username/password and returns a JWT.
+func (h *AuthHandler) Login(c *gin.Context) <span class="cov8" title="1">{
+        var req loginRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "username and password are required"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">if req.Username != "admin" || req.Password != "admin" </span><span class="cov8" title="1">{
+                c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var user models.User
+        result := h.db.Where("email = ?", "admin@mtracker.local").First(&amp;user)
+        if result.Error == gorm.ErrRecordNotFound </span><span class="cov8" title="1">{
+                user = models.User{
+                        Email: "admin@mtracker.local",
+                        Name:  "Admin",
+                }
+                if err := h.db.Create(&amp;user).Error; err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+                        return
+                }</span>
+        } else<span class="cov8" title="1"> if result.Error != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">token, err := h.issueJWT(user)
+        if err != nil </span><span class="cov0" title="0">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue token"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{"token": token, "user": user})</span>
+}
+
+// GetProfile returns the authenticated user's profile.
+func (h *AuthHandler) GetProfile(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        var user models.User
+        if err := h.db.First(&amp;user, "id = ?", userID).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, user)</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package handlers
+
+import (
+        "net/http"
+        "time"
+
+        "github.com/aash/mtracker/apps/api/internal/middleware"
+        "github.com/aash/mtracker/apps/api/internal/models"
+        "github.com/gin-gonic/gin"
+        "github.com/google/uuid"
+        "gorm.io/gorm"
+)
+
+type LogsHandler struct {
+        db *gorm.DB
+}
+
+func NewLogsHandler(db *gorm.DB) *LogsHandler <span class="cov8" title="1">{
+        return &amp;LogsHandler{db: db}
+}</span>
+
+type createLogRequest struct {
+        ActivityID string `json:"activity_id" binding:"required"`
+        LoggedDate string `json:"logged_date" binding:"required"` // YYYY-MM-DD
+}
+
+// Create records that an activity happened on a given date.
+// Only today or the previous 2 days are accepted.
+func (h *LogsHandler) Create(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+
+        var req createLogRequest
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }</span>
+
+        <span class="cov8" title="1">activityID, err := uuid.Parse(req.ActivityID)
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid activity_id"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">loggedDate, err := time.Parse("2006-01-02", req.LoggedDate)
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "logged_date must be YYYY-MM-DD"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">today := time.Now().UTC().Truncate(24 * time.Hour)
+        earliest := today.AddDate(0, 0, -30)
+        if loggedDate.Before(earliest) || loggedDate.After(today) </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "date must be today or within the past 30 days"})
+                return
+        }</span>
+
+        // Verify the activity belongs to this user
+        <span class="cov8" title="1">var activity models.Activity
+        if err := h.db.First(&amp;activity, "id = ? AND user_id = ?", activityID, userID).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusNotFound, gin.H{"error": "activity not found"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">log := models.ActivityLog{
+                ActivityID: activityID,
+                UserID:     userID,
+                LoggedDate: loggedDate,
+        }
+
+        if err := h.db.Create(&amp;log).Error; err != nil </span><span class="cov8" title="1">{
+                // Unique constraint violation means it was already logged
+                c.JSON(http.StatusConflict, gin.H{"error": "activity already logged for this date"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusCreated, log)</span>
+}
+
+// ListByActivity returns all log dates for a given activity (used by the analytics calendar).
+func (h *LogsHandler) ListByActivity(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        activityIDStr := c.Query("activity_id")
+        if activityIDStr == "" </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "activity_id query param is required"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">activityID, err := uuid.Parse(activityIDStr)
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid activity_id"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">var logs []models.ActivityLog
+        if err := h.db.Where("activity_id = ? AND user_id = ?", activityID, userID).
+                Order("logged_date ASC").
+                Find(&amp;logs).Error; err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, logs)</span>
+}
+
+// Delete removes a specific log entry.
+func (h *LogsHandler) Delete(c *gin.Context) <span class="cov8" title="1">{
+        userID := middleware.UserIDFromCtx(c)
+        logID, err := uuid.Parse(c.Param("id"))
+        if err != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid log id"})
+                return
+        }</span>
+
+        <span class="cov8" title="1">result := h.db.Where("id = ? AND user_id = ?", logID, userID).Delete(&amp;models.ActivityLog{})
+        if result.Error != nil </span><span class="cov8" title="1">{
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete log"})
+                return
+        }</span>
+        <span class="cov8" title="1">if result.RowsAffected == 0 </span><span class="cov8" title="1">{
+                c.JSON(http.StatusNotFound, gin.H{"error": "log not found"})
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, gin.H{"message": "deleted"})</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package middleware
+
+import (
+        "net/http"
+        "strings"
+
+        "github.com/gin-gonic/gin"
+        "github.com/golang-jwt/jwt/v5"
+        "github.com/google/uuid"
+)
+
+type Claims struct {
+        UserID uuid.UUID `json:"user_id"`
+        Email  string    `json:"email"`
+        jwt.RegisteredClaims
+}
+
+func Auth(jwtSecret string) gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                header := c.GetHeader("Authorization")
+                if header == "" || !strings.HasPrefix(header, "Bearer ") </span><span class="cov8" title="1">{
+                        c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+                        return
+                }</span>
+
+                <span class="cov8" title="1">tokenStr := strings.TrimPrefix(header, "Bearer ")
+                claims := &amp;Claims{}
+
+                token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) </span><span class="cov8" title="1">{
+                        if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok </span><span class="cov8" title="1">{
+                                return nil, jwt.ErrSignatureInvalid
+                        }</span>
+                        <span class="cov8" title="1">return []byte(jwtSecret), nil</span>
+                })
+
+                <span class="cov8" title="1">if err != nil || !token.Valid </span><span class="cov8" title="1">{
+                        c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+                        return
+                }</span>
+
+                <span class="cov8" title="1">c.Set("user_id", claims.UserID)
+                c.Set("email", claims.Email)
+                c.Next()</span>
+        }
+}
+
+func UserIDFromCtx(c *gin.Context) uuid.UUID <span class="cov8" title="1">{
+        v, _ := c.Get("user_id")
+        id, _ := v.(uuid.UUID)
+        return id
+}</span>
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package middleware
+
+import (
+        "bytes"
+        "io"
+        "log"
+
+        "github.com/gin-gonic/gin"
+)
+
+func RequestLogger() gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                var bodyBytes []byte
+                if c.Request.Body != nil </span><span class="cov8" title="1">{
+                        bodyBytes, _ = io.ReadAll(c.Request.Body)
+                        c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+                }</span>
+
+                <span class="cov8" title="1">log.Printf("[REQ] %s %s | query: %s | body: %s",
+                        c.Request.Method,
+                        c.Request.URL.Path,
+                        c.Request.URL.RawQuery,
+                        string(bodyBytes),
+                )
+
+                c.Next()</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package models
+
+import (
+        "time"
+
+        "github.com/google/uuid"
+        "gorm.io/gorm"
+)
+
+type User struct {
+        ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+        Email     string    `gorm:"uniqueIndex;not null"                           json:"email"`
+        GoogleID  string    `gorm:"uniqueIndex;not null"                           json:"-"`
+        Name      string    `gorm:"not null"                                       json:"name"`
+        AvatarURL string    `                                                      json:"avatar_url"`
+        CreatedAt time.Time `                                                      json:"created_at"`
+        UpdatedAt time.Time `                                                      json:"updated_at"`
+}
+
+type Activity struct {
+        ID             uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+        UserID         uuid.UUID  `gorm:"type:uuid;not null;index"                       json:"user_id"`
+        Name           string     `gorm:"not null"                                       json:"name"`
+        Description    string     `                                                      json:"description"`
+        Color          string     `gorm:"not null"                                       json:"color"`
+        CreatedAt      time.Time  `                                                      json:"created_at"`
+        UpdatedAt      time.Time  `                                                      json:"updated_at"`
+        LastLoggedDate *time.Time `gorm:"-:all"                                          json:"last_logged_date"`
+}
+
+type ActivityLog struct {
+        ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+        ActivityID uuid.UUID `gorm:"type:uuid;not null;index"                       json:"activity_id"`
+        UserID     uuid.UUID `gorm:"type:uuid;not null;index"                       json:"user_id"`
+        LoggedDate time.Time `gorm:"type:date;not null"                             json:"logged_date"`
+        CreatedAt  time.Time `                                                      json:"created_at"`
+}
+
+func (ActivityLog) TableName() string <span class="cov8" title="1">{ return "activity_logs" }</span>
+
+func (u *User) BeforeCreate(tx *gorm.DB) error <span class="cov8" title="1">{
+        if u.ID == uuid.Nil </span><span class="cov8" title="1">{
+                u.ID = uuid.New()
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (a *Activity) BeforeCreate(tx *gorm.DB) error <span class="cov8" title="1">{
+        if a.ID == uuid.Nil </span><span class="cov8" title="1">{
+                a.ID = uuid.New()
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (l *ActivityLog) BeforeCreate(tx *gorm.DB) error <span class="cov8" title="1">{
+        if l.ID == uuid.Nil </span><span class="cov8" title="1">{
+                l.ID = uuid.New()
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package router
+
+import (
+        "github.com/aash/mtracker/apps/api/internal/config"
+        "github.com/aash/mtracker/apps/api/internal/handlers"
+        "github.com/aash/mtracker/apps/api/internal/middleware"
+        "github.com/gin-gonic/gin"
+        "gorm.io/gorm"
+)
+
+func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine <span class="cov8" title="1">{
+        r := gin.Default()
+
+        r.Use(middleware.RequestLogger())
+
+        r.Use(func(c *gin.Context) </span><span class="cov0" title="0">{
+                c.Header("Access-Control-Allow-Origin", "*")
+                c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                if c.Request.Method == "OPTIONS" </span><span class="cov0" title="0">{
+                        c.AbortWithStatus(204)
+                        return
+                }</span>
+                <span class="cov0" title="0">c.Next()</span>
+        })
+
+        <span class="cov8" title="1">authH := handlers.NewAuthHandler(db, cfg.JWTSecret)
+        activitiesH := handlers.NewActivitiesHandler(db)
+        logsH := handlers.NewLogsHandler(db)
+        analyticsH := handlers.NewAnalyticsHandler(db)
+
+        v1 := r.Group("/api/v1")
+        </span><span class="cov8" title="1">{
+                // Public
+                v1.POST("/auth/login", authH.Login)
+
+                // Protected
+                protected := v1.Group("/")
+                protected.Use(middleware.Auth(cfg.JWTSecret))
+                </span><span class="cov8" title="1">{
+                        protected.GET("/profile", authH.GetProfile)
+
+                        protected.GET("/activities", activitiesH.List)
+                        protected.POST("/activities", activitiesH.Create)
+                        protected.GET("/activities/search", activitiesH.Search)
+                        protected.DELETE("/activities/:id", activitiesH.Delete)
+
+                        protected.GET("/logs", logsH.ListByActivity)
+                        protected.POST("/logs", logsH.Create)
+                        protected.DELETE("/logs/:id", logsH.Delete)
+
+                        protected.GET("/analytics", analyticsH.Summary)
+                }</span>
+        }
+
+        <span class="cov8" title="1">r.GET("/health", func(c *gin.Context) </span><span class="cov0" title="0">{
+                c.JSON(200, gin.H{"status": "ok"})
+        }</span>)
+
+        <span class="cov8" title="1">return r</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
