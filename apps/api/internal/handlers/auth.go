@@ -34,6 +34,36 @@ type googleAuthRequest struct {
 	AccessToken string `json:"access_token" binding:"required"`
 }
 
+// findOrCreateByIdentity looks up a user via user_identities. If no matching
+// identity exists, it creates a new User (using newUser) and links it.
+// Returns the user and whether it was newly created.
+func (h *AuthHandler) findOrCreateByIdentity(provider models.Provider, providerUserID string, newUser func() models.User) (models.User, bool, error) {
+	var identity models.UserIdentity
+	err := h.db.Where("provider = ? AND provider_user_id = ?", provider, providerUserID).First(&identity).Error
+	if err == gorm.ErrRecordNotFound {
+		user := newUser()
+		if err := h.db.Create(&user).Error; err != nil {
+			return models.User{}, false, err
+		}
+		identity = models.UserIdentity{
+			UserID:         user.ID,
+			Provider:       provider,
+			ProviderUserID: providerUserID,
+		}
+		if err := h.db.Create(&identity).Error; err != nil {
+			return models.User{}, false, err
+		}
+		return user, true, nil
+	} else if err != nil {
+		return models.User{}, false, err
+	}
+	var user models.User
+	if err := h.db.First(&user, "id = ?", identity.UserID).Error; err != nil {
+		return models.User{}, false, err
+	}
+	return user, false, nil
+}
+
 // GoogleSignIn verifies a Google OAuth access token, upserts the user, and returns a JWT.
 func (h *AuthHandler) GoogleSignIn(c *gin.Context) {
 	var req googleAuthRequest
@@ -48,27 +78,15 @@ func (h *AuthHandler) GoogleSignIn(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	result := h.db.Where("google_id = ?", info.Sub).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
-		user = models.User{
-			Email:     info.Email,
-			GoogleID:  info.Sub,
-			Name:      info.Name,
-			AvatarURL: info.Picture,
-		}
-		if err := h.db.Create(&user).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-			return
-		}
-	} else if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+	user, created, err := h.findOrCreateByIdentity(models.ProviderGoogle, info.Sub, func() models.User {
+		return models.User{Email: info.Email, Name: info.Name, AvatarURL: info.Picture}
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upsert user"})
 		return
-	} else {
-		h.db.Model(&user).Updates(map[string]interface{}{
-			"name":       info.Name,
-			"avatar_url": info.Picture,
-		})
+	}
+	if !created {
+		h.db.Model(&user).Updates(map[string]interface{}{"name": info.Name, "avatar_url": info.Picture})
 	}
 
 	token, err := h.issueJWT(user)
@@ -77,10 +95,7 @@ func (h *AuthHandler) GoogleSignIn(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user":  user,
-	})
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
 // jwtSigner is the function that signs a JWT token; overridable in tests.
@@ -146,19 +161,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	result := h.db.Where("email = ?", "admin@mtracker.local").First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
-		user = models.User{
-			Email: "admin@mtracker.local",
-			Name:  "Admin",
-		}
-		if err := h.db.Create(&user).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-			return
-		}
-	} else if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+	user, _, err := h.findOrCreateByIdentity(models.ProviderPassword, "admin", func() models.User {
+		return models.User{Email: "admin@mtracker.local", Name: "Admin"}
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 

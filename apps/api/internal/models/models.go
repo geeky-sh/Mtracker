@@ -7,14 +7,32 @@ import (
 	"gorm.io/gorm"
 )
 
+type Provider string
+
+const (
+	ProviderGoogle   Provider = "google"
+	ProviderPassword Provider = "password"
+	ProviderGitHub   Provider = "github"
+	ProviderApple    Provider = "apple"
+	ProviderFacebook Provider = "facebook"
+)
+
 type User struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Email     string    `gorm:"uniqueIndex;not null"                           json:"email"`
-	GoogleID  string    `gorm:"uniqueIndex;not null"                           json:"-"`
 	Name      string    `gorm:"not null"                                       json:"name"`
 	AvatarURL string    `                                                      json:"avatar_url"`
 	CreatedAt time.Time `                                                      json:"created_at"`
 	UpdatedAt time.Time `                                                      json:"updated_at"`
+}
+
+type UserIdentity struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	UserID         uuid.UUID `gorm:"type:uuid;not null;index"                       json:"user_id"`
+	Provider       Provider  `gorm:"not null"                                       json:"provider"`
+	ProviderUserID string    `gorm:"not null"                                       json:"provider_user_id"`
+	CreatedAt      time.Time `                                                      json:"created_at"`
+	UpdatedAt      time.Time `                                                      json:"updated_at"`
 }
 
 type Activity struct {
@@ -41,6 +59,13 @@ func (ActivityLog) TableName() string { return "activity_logs" }
 func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == uuid.Nil {
 		u.ID = uuid.New()
+	}
+	return nil
+}
+
+func (i *UserIdentity) BeforeCreate(tx *gorm.DB) error {
+	if i.ID == uuid.Nil {
+		i.ID = uuid.New()
 	}
 	return nil
 }

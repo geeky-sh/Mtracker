@@ -14,6 +14,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/aash/mtracker/apps/api/internal/models"
 )
 
 func postJSON(body string) (*gin.Context, *httptest.ResponseRecorder) {
@@ -45,7 +47,7 @@ func TestLogin_WrongCredentials(t *testing.T) {
 func TestLogin_DBError(t *testing.T) {
 	db, mock := newMockDB(t)
 	h := NewAuthHandler(db, "secret")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnError(errors.New("db down"))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnError(errors.New("db down"))
 	c, w := postJSON(`{"username":"admin","password":"admin"}`)
 	h.Login(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -54,8 +56,10 @@ func TestLogin_DBError(t *testing.T) {
 func TestLogin_UserNotFound_CreateSuccess(t *testing.T) {
 	db, mock := newMockDB(t)
 	h := NewAuthHandler(db, "secret")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(sqlmock.NewRows(nil))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(sqlmock.NewRows(nil))
 	mock.ExpectQuery(`INSERT INTO "users"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+	mock.ExpectQuery(`INSERT INTO "user_identities"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
 	c, w := postJSON(`{"username":"admin","password":"admin"}`)
 	h.Login(c)
@@ -66,7 +70,7 @@ func TestLogin_UserNotFound_CreateSuccess(t *testing.T) {
 func TestLogin_UserNotFound_CreateError(t *testing.T) {
 	db, mock := newMockDB(t)
 	h := NewAuthHandler(db, "secret")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(sqlmock.NewRows(nil))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(sqlmock.NewRows(nil))
 	mock.ExpectQuery(`INSERT INTO "users"`).WillReturnError(errors.New("insert failed"))
 	c, w := postJSON(`{"username":"admin","password":"admin"}`)
 	h.Login(c)
@@ -77,9 +81,12 @@ func TestLogin_UserExists(t *testing.T) {
 	db, mock := newMockDB(t)
 	h := NewAuthHandler(db, "secret")
 	uid := uuid.New()
-	rows := sqlmock.NewRows([]string{"id", "email", "google_id", "name", "avatar_url"}).
-		AddRow(uid, "admin@mtracker.local", "", "Admin", "")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(rows)
+	identityRows := sqlmock.NewRows([]string{"id", "user_id", "provider", "provider_user_id"}).
+		AddRow(uuid.New(), uid, models.ProviderPassword, "admin")
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(identityRows)
+	userRows := sqlmock.NewRows([]string{"id", "email", "name", "avatar_url"}).
+		AddRow(uid, "admin@mtracker.local", "Admin", "")
+	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(userRows)
 	c, w := postJSON(`{"username":"admin","password":"admin"}`)
 	h.Login(c)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -139,9 +146,12 @@ func TestLogin_JWTSignError(t *testing.T) {
 	h := NewAuthHandler(db, "secret")
 	withFailingSigner(t)
 	uid := uuid.New()
-	rows := sqlmock.NewRows([]string{"id", "email", "google_id", "name", "avatar_url"}).
-		AddRow(uid, "admin@mtracker.local", "", "Admin", "")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(rows)
+	identityRows := sqlmock.NewRows([]string{"id", "user_id", "provider", "provider_user_id"}).
+		AddRow(uuid.New(), uid, models.ProviderPassword, "admin")
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(identityRows)
+	userRows := sqlmock.NewRows([]string{"id", "email", "name", "avatar_url"}).
+		AddRow(uid, "admin@mtracker.local", "Admin", "")
+	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(userRows)
 	c, w := postJSON(`{"username":"admin","password":"admin"}`)
 	h.Login(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -154,9 +164,12 @@ func TestGoogleSignIn_JWTSignError(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"sub": "gid1", "email": "g@ex.com", "name": "G"})
 	mockGoogleServer(t, http.StatusOK, string(body))
 	uid := uuid.New()
-	rows := sqlmock.NewRows([]string{"id", "email", "google_id", "name", "avatar_url"}).
-		AddRow(uid, "g@ex.com", "gid1", "G", "")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(rows)
+	identityRows := sqlmock.NewRows([]string{"id", "user_id", "provider", "provider_user_id"}).
+		AddRow(uuid.New(), uid, models.ProviderGoogle, "gid1")
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(identityRows)
+	userRows := sqlmock.NewRows([]string{"id", "email", "name", "avatar_url"}).
+		AddRow(uid, "g@ex.com", "G", "")
+	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(userRows)
 	c, w := postJSON(`{"access_token":"tok"}`)
 	h.GoogleSignIn(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -238,8 +251,10 @@ func TestGoogleSignIn_NewUser_CreateSuccess(t *testing.T) {
 	h := NewAuthHandler(db, "secret")
 	body, _ := json.Marshal(map[string]string{"sub": "gid1", "email": "g@ex.com", "name": "G"})
 	mockGoogleServer(t, http.StatusOK, string(body))
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(sqlmock.NewRows(nil))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(sqlmock.NewRows(nil))
 	mock.ExpectQuery(`INSERT INTO "users"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
+	mock.ExpectQuery(`INSERT INTO "user_identities"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.New()))
 	c, w := postJSON(`{"access_token":"tok"}`)
 	h.GoogleSignIn(c)
@@ -251,7 +266,7 @@ func TestGoogleSignIn_NewUser_CreateError(t *testing.T) {
 	h := NewAuthHandler(db, "secret")
 	body, _ := json.Marshal(map[string]string{"sub": "gid1", "email": "g@ex.com", "name": "G"})
 	mockGoogleServer(t, http.StatusOK, string(body))
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(sqlmock.NewRows(nil))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(sqlmock.NewRows(nil))
 	mock.ExpectQuery(`INSERT INTO "users"`).WillReturnError(errors.New("insert failed"))
 	c, w := postJSON(`{"access_token":"tok"}`)
 	h.GoogleSignIn(c)
@@ -264,9 +279,12 @@ func TestGoogleSignIn_ExistingUser(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"sub": "gid1", "email": "g@ex.com", "name": "G"})
 	mockGoogleServer(t, http.StatusOK, string(body))
 	uid := uuid.New()
-	rows := sqlmock.NewRows([]string{"id", "email", "google_id", "name", "avatar_url"}).
-		AddRow(uid, "g@ex.com", "gid1", "G", "")
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(rows)
+	identityRows := sqlmock.NewRows([]string{"id", "user_id", "provider", "provider_user_id"}).
+		AddRow(uuid.New(), uid, models.ProviderGoogle, "gid1")
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnRows(identityRows)
+	userRows := sqlmock.NewRows([]string{"id", "email", "name", "avatar_url"}).
+		AddRow(uid, "g@ex.com", "G", "")
+	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnRows(userRows)
 	c, w := postJSON(`{"access_token":"tok"}`)
 	h.GoogleSignIn(c)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -277,7 +295,7 @@ func TestGoogleSignIn_DBError(t *testing.T) {
 	h := NewAuthHandler(db, "secret")
 	body, _ := json.Marshal(map[string]string{"sub": "gid1", "email": "g@ex.com", "name": "G"})
 	mockGoogleServer(t, http.StatusOK, string(body))
-	mock.ExpectQuery(`SELECT .* FROM "users"`).WillReturnError(errors.New("db down"))
+	mock.ExpectQuery(`SELECT .* FROM "user_identities"`).WillReturnError(errors.New("db down"))
 	c, w := postJSON(`{"access_token":"tok"}`)
 	h.GoogleSignIn(c)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

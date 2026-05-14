@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+
 	"github.com/aash/mtracker/apps/api/internal/config"
 	"github.com/aash/mtracker/apps/api/internal/models"
 	"gorm.io/driver/postgres"
@@ -27,13 +29,30 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 
 	if err := db.AutoMigrate(
 		&models.User{},
+		&models.UserIdentity{},
 		&models.Activity{},
 		&models.ActivityLog{},
 	); err != nil {
 		return nil, err
 	}
 
-	// Unique constraint: one log per activity per day
+	// Backfill user_identities from the legacy google_id column (if it still exists).
+	db.Exec(fmt.Sprintf(`
+		INSERT INTO user_identities (id, user_id, provider, provider_user_id, created_at, updated_at)
+		SELECT gen_random_uuid(), id, '%s', google_id, now(), now()
+		FROM users
+		WHERE google_id IS NOT NULL AND google_id != ''
+		ON CONFLICT DO NOTHING
+	`, models.ProviderGoogle))
+	db.Exec(`ALTER TABLE users DROP COLUMN IF EXISTS google_id`)
+
+	// Unique constraint: one identity per provider per external user.
+	db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_provider
+		ON user_identities (provider, provider_user_id)
+	`)
+
+	// Unique constraint: one log per activity per day.
 	db.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_logs_activity_date
 		ON activity_logs (activity_id, logged_date)
