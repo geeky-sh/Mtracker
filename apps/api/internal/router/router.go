@@ -33,6 +33,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	{
 		// Public
 		v1.POST("/auth/login", authH.Login)
+		v1.POST("/auth/google", authH.GoogleSignIn)
 
 		// Protected
 		protected := v1.Group("/")

@@ -58,6 +58,12 @@ export async function loginWithPassword(username: string, password: string) {
   return data as { token: string; user: import('@/types').User };
 }
 
+export async function loginWithGoogle(accessToken: string) {
+  const { data } = await api.post('/auth/google', { access_token: accessToken });
+  await saveToken(data.token);
+  return data as { token: string; user: import('@/types').User };
+}
+
 export async function getProfile() {
   const { data } = await api.get('/profile');
   return data as import('@/types').User;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { login } from '@/services/auth';
+import { handleGoogleResponse, login, useGoogleAuth } from '@/services/auth';
 import { User } from '@/types';
 
 interface Props {
@@ -19,6 +19,20 @@ export function LoginScreen({ onLogin }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { request, response, promptAsync } = useGoogleAuth();
+
+  useEffect(() => {
+    if (response?.type !== 'success') return;
+    setLoading(true);
+    handleGoogleResponse(response)
+      .then((result) => {
+        if (result) onLogin(result.user);
+        else Alert.alert('Google Sign-In failed', 'Could not complete sign in.');
+      })
+      .catch(() => Alert.alert('Google Sign-In failed', 'An error occurred.'))
+      .finally(() => setLoading(false));
+  }, [response]);
 
   async function handleLogin() {
     if (!username || !password) {
@@ -61,9 +75,25 @@ export function LoginScreen({ onLogin }: Props) {
       {loading ? (
         <ActivityIndicator size="large" color="#4ECDC4" style={styles.spinner} />
       ) : (
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Sign In</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity style={styles.button} onPress={handleLogin}>
+            <Text style={styles.buttonText}>Sign In</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.googleButton, !request && styles.googleButtonDisabled]}
+            onPress={() => promptAsync()}
+            disabled={!request}
+          >
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
@@ -116,5 +146,39 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: 16,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#999',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  googleButton: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  googleButtonDisabled: {
+    opacity: 0.5,
+  },
+  googleButtonText: {
+    color: '#1a1a1a',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
